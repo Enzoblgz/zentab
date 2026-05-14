@@ -4,8 +4,8 @@ const IS_FIREFOX = typeof globalThis.browser !== "undefined"
 const NEW_TAB_URL = IS_FIREFOX ? "about:newtab" : "chrome://newtab"
 
 const LABEL_COLORS = [
-  "#e2e8f0", "#fecaca", "#fed7aa", "#fef08a",
-  "#bbf7d0", "#bae6fd", "#e9d5ff", "#fbcfe8",
+  "#3f3f46", "#7f1d1d", "#78350f", "#713f12",
+  "#14532d", "#164e63", "#3b0764", "#500724",
 ]
 
 export default function App() {
@@ -27,7 +27,6 @@ export default function App() {
     const data = await chrome.storage.local.get(["sessions", "labels"])
     setSessions((data.sessions || []).filter(s => Array.isArray(s.windows)))
     setLabels(data.labels || [])
-
     const win = await chrome.windows.getCurrent({ populate: true })
     setCurrentWindowId(win.id)
     setCurrentTabs(win.tabs || [])
@@ -56,11 +55,7 @@ export default function App() {
     try {
       const tabs = currentTabs
         .filter(t => selectedIds.has(t.id))
-        .map(tab => ({
-          title: tab.title,
-          url: tab.url,
-          favicon: tab.favIconUrl || null,
-        }))
+        .map(tab => ({ title: tab.title, url: tab.url, favicon: tab.favIconUrl || null }))
       setPendingSave({
         windowId: currentWindowId,
         tabIds: [...selectedIds],
@@ -130,9 +125,7 @@ export default function App() {
   }
 
   async function toggleStar(id) {
-    const updated = sessions.map(s =>
-      s.id === id ? { ...s, starred: !s.starred } : s
-    )
+    const updated = sessions.map(s => s.id === id ? { ...s, starred: !s.starred } : s)
     await chrome.storage.local.set({ sessions: updated })
     setSessions(updated)
   }
@@ -158,185 +151,193 @@ export default function App() {
   useEffect(() => { load() }, [])
 
   const allSelected = currentTabs.length > 0 && selectedIds.size === currentTabs.length
-  const filtered = filterLabelId ? sessions.filter(s => s.labelId === filterLabelId) : sessions
+
+  const baseFiltered = filterLabelId ? sessions.filter(s => s.labelId === filterLabelId) : sessions
+  const filtered = [
+    ...baseFiltered.filter(s => s.starred),
+    ...baseFiltered.filter(s => !s.starred),
+  ]
 
   return (
-    <div className="w-[400px] bg-white p-5">
+    <div className="w-[400px] bg-[#111] p-5">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-base font-semibold tracking-tight text-gray-900">ZenTab</h1>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-base font-semibold tracking-tight text-[#e8e8e8]">ZenTab</h1>
         {sessions.length > 0 && (
-          <span className="text-xs text-gray-400">{sessions.length} saved</span>
+          <span className="text-xs text-[#444]">{sessions.length} saved</span>
         )}
       </div>
 
-      {pendingSave ? (
-        /* Save mode picker */
-        <div className="border border-gray-200 rounded-xl p-3 mb-4">
-          <p className="text-sm font-medium text-gray-800 mb-2.5">
-            {pendingSave.tabs.length} tab{pendingSave.tabs.length !== 1 ? "s" : ""}
-          </p>
+      {/* ── SAVE SECTION ── */}
+      <div className="mb-5">
+        <p className="text-[10px] font-medium text-[#444] uppercase tracking-widest mb-3">
+          Save
+        </p>
 
-          {/* Mode toggle */}
-          <div className="flex gap-1.5 mb-3">
-            {["new", "existing"].map(mode => (
-              <button
-                key={mode}
-                onClick={() => setSaveMode(mode)}
-                disabled={mode === "existing" && sessions.length === 0}
-                className={`text-xs px-2.5 py-1 rounded-lg border transition-colors disabled:opacity-30 ${
-                  saveMode === mode
-                    ? "border-gray-800 bg-gray-800 text-white"
-                    : "border-gray-200 text-gray-500 hover:border-gray-300"
-                }`}
-              >
-                {mode === "new" ? "New session" : "Add to existing"}
-              </button>
-            ))}
-          </div>
+        {pendingSave ? (
+          <div className="border border-[#2a2a2a] rounded-xl p-3">
+            <p className="text-sm font-medium text-[#e8e8e8] mb-3">
+              {pendingSave.tabs.length} tab{pendingSave.tabs.length !== 1 ? "s" : ""}
+            </p>
 
-          {saveMode === "new" ? (
-            /* Label picker */
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              <button
-                onClick={() => setChosenLabelId(null)}
-                className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-                  chosenLabelId === null
-                    ? "border-gray-800 bg-gray-800 text-white"
-                    : "border-gray-200 text-gray-500 hover:border-gray-300"
-                }`}
-              >
-                No label
-              </button>
-              {labels.map(label => (
+            <div className="flex gap-1.5 mb-3">
+              {["new", "existing"].map(mode => (
                 <button
-                  key={label.id}
-                  onClick={() => setChosenLabelId(label.id === chosenLabelId ? null : label.id)}
-                  style={chosenLabelId === label.id ? { backgroundColor: label.color } : undefined}
-                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-                    chosenLabelId === label.id
-                      ? "border-transparent text-gray-800"
-                      : "border-gray-200 text-gray-500 hover:border-gray-300"
+                  key={mode}
+                  onClick={() => setSaveMode(mode)}
+                  disabled={mode === "existing" && sessions.length === 0}
+                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors disabled:opacity-20 ${
+                    saveMode === mode
+                      ? "border-white bg-white text-[#111]"
+                      : "border-[#2a2a2a] text-[#666] hover:border-[#3a3a3a]"
                   }`}
                 >
-                  {label.name}
+                  {mode === "new" ? "New session" : "Add to existing"}
                 </button>
               ))}
             </div>
-          ) : (
-            /* Existing session picker */
-            <div className="max-h-[150px] overflow-y-auto space-y-1 mb-3">
-              {sessions.map(session => {
-                const count = (session.windows || []).flatMap(w => w.tabs || []).length
-                const label = labels.find(l => l.id === session.labelId)
-                const isSelected = targetSessionId === session.id
-                return (
+
+            {saveMode === "new" ? (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <button
+                  onClick={() => setChosenLabelId(null)}
+                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                    chosenLabelId === null
+                      ? "border-white bg-white text-[#111]"
+                      : "border-[#2a2a2a] text-[#666] hover:border-[#3a3a3a]"
+                  }`}
+                >
+                  No label
+                </button>
+                {labels.map(label => (
                   <button
-                    key={session.id}
-                    onClick={() => setTargetSessionId(isSelected ? null : session.id)}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
-                      isSelected
-                        ? "border-gray-800 bg-gray-50"
-                        : "border-gray-100 hover:border-gray-200"
+                    key={label.id}
+                    onClick={() => setChosenLabelId(label.id === chosenLabelId ? null : label.id)}
+                    style={chosenLabelId === label.id ? { backgroundColor: label.color } : undefined}
+                    className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                      chosenLabelId === label.id
+                        ? "border-transparent text-[#e8e8e8]"
+                        : "border-[#2a2a2a] text-[#666] hover:border-[#3a3a3a]"
                     }`}
                   >
-                    <span className="font-medium text-gray-800">{count} tab{count !== 1 ? "s" : ""}</span>
-                    {label && (
-                      <span
-                        style={{ backgroundColor: label.color }}
-                        className="ml-1.5 px-1.5 py-0.5 rounded text-gray-700"
-                      >
-                        {label.name}
-                      </span>
-                    )}
-                    <span className="text-gray-400 ml-1.5">{session.createdAt}</span>
+                    {label.name}
                   </button>
-                )
-              })}
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="max-h-[140px] overflow-y-auto space-y-1 mb-3">
+                {sessions.map(session => {
+                  const count = (session.windows || []).flatMap(w => w.tabs || []).length
+                  const label = labels.find(l => l.id === session.labelId)
+                  const isSelected = targetSessionId === session.id
+                  return (
+                    <button
+                      key={session.id}
+                      onClick={() => setTargetSessionId(isSelected ? null : session.id)}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
+                        isSelected
+                          ? "border-white bg-[#1e1e1e] text-[#e8e8e8]"
+                          : "border-[#222] text-[#888] hover:border-[#333]"
+                      }`}
+                    >
+                      <span className="font-medium">{count} tab{count !== 1 ? "s" : ""}</span>
+                      {label && (
+                        <span style={{ backgroundColor: label.color }} className="ml-1.5 px-1.5 py-0.5 rounded text-[#e8e8e8]">
+                          {label.name}
+                        </span>
+                      )}
+                      <span className="text-[#444] ml-1.5">{session.createdAt}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
 
-          <div className="flex gap-2">
-            <button
-              onClick={confirmSave}
-              disabled={saveMode === "existing" && !targetSessionId}
-              className="flex-1 bg-gray-900 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-30"
-            >
-              Save & close
-            </button>
-            <button
-              onClick={() => setPendingSave(null)}
-              className="text-sm text-gray-400 px-3 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* Tab selector */
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-              This window
-            </span>
-            <button
-              onClick={toggleAll}
-              className="text-xs text-gray-400 hover:text-gray-700"
-            >
-              {allSelected ? "Deselect all" : "Select all"}
-            </button>
-          </div>
-
-          <div className="max-h-[180px] overflow-y-auto space-y-0.5 mb-3">
-            {currentTabs.map(tab => (
-              <label
-                key={tab.id}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer"
+            <div className="flex gap-2">
+              <button
+                onClick={confirmSave}
+                disabled={saveMode === "existing" && !targetSessionId}
+                className="flex-1 bg-white text-[#111] rounded-lg py-2 text-sm font-medium disabled:opacity-20"
               >
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(tab.id)}
-                  onChange={() => toggleTab(tab.id)}
-                  className="w-3.5 h-3.5 flex-shrink-0 accent-gray-900"
-                />
-                {tab.favIconUrl ? (
-                  <img
-                    src={tab.favIconUrl}
-                    className="w-3.5 h-3.5 flex-shrink-0"
-                    onError={e => { e.currentTarget.style.display = "none" }}
-                  />
-                ) : (
-                  <div className="w-3.5 h-3.5 rounded-sm bg-gray-100 flex-shrink-0" />
-                )}
-                <span className="text-xs text-gray-700 truncate">{tab.title}</span>
-              </label>
-            ))}
+                Save & close
+              </button>
+              <button
+                onClick={() => setPendingSave(null)}
+                className="text-sm text-[#555] px-3 rounded-lg hover:bg-[#1a1a1a]"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
+        ) : (
+          <>
+            <div className="max-h-[180px] overflow-y-auto space-y-0.5 mb-3">
+              {currentTabs.map(tab => (
+                <label
+                  key={tab.id}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#1a1a1a] cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(tab.id)}
+                    onChange={() => toggleTab(tab.id)}
+                    className="w-3.5 h-3.5 flex-shrink-0 accent-white"
+                  />
+                  {tab.favIconUrl ? (
+                    <img
+                      src={tab.favIconUrl}
+                      className="w-3.5 h-3.5 flex-shrink-0"
+                      onError={e => { e.currentTarget.style.display = "none" }}
+                    />
+                  ) : (
+                    <div className="w-3.5 h-3.5 rounded-sm bg-[#222] flex-shrink-0" />
+                  )}
+                  <span className="text-xs text-[#aaa] truncate">{tab.title}</span>
+                </label>
+              ))}
+            </div>
 
-          <button
-            onClick={startSave}
-            disabled={selectedIds.size === 0 || saving}
-            className="w-full bg-gray-900 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-30 transition-opacity"
-          >
-            {selectedIds.size === 0
-              ? "Select tabs to save"
-              : allSelected
-              ? "Save & close all tabs"
-              : `Save & close ${selectedIds.size} tab${selectedIds.size !== 1 ? "s" : ""}`}
-          </button>
-        </div>
-      )}
+            <div className="flex items-center justify-between mb-2.5">
+              <button onClick={toggleAll} className="text-xs text-[#444] hover:text-[#888]">
+                {allSelected ? "Deselect all" : "Select all"}
+              </button>
+              <span className="text-xs text-[#444]">
+                {selectedIds.size}/{currentTabs.length} selected
+              </span>
+            </div>
+
+            <button
+              onClick={startSave}
+              disabled={selectedIds.size === 0 || saving}
+              className="w-full bg-white text-[#111] rounded-xl py-2.5 text-sm font-medium disabled:opacity-20 transition-opacity"
+            >
+              {selectedIds.size === 0
+                ? "Select tabs to save"
+                : allSelected
+                ? "Save & close all tabs"
+                : `Save & close ${selectedIds.size} tab${selectedIds.size !== 1 ? "s" : ""}`}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* ── DIVIDER ── */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex-1 h-px bg-[#1e1e1e]" />
+        <span className="text-[10px] font-medium text-[#333] uppercase tracking-widest">Sessions</span>
+        <div className="flex-1 h-px bg-[#1e1e1e]" />
+      </div>
 
       {/* Label filter pills */}
       {labels.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="flex flex-wrap gap-1.5 mb-3">
           <button
             onClick={() => setFilterLabelId(null)}
             className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
               filterLabelId === null
-                ? "border-gray-800 bg-gray-800 text-white"
-                : "border-gray-200 text-gray-500 hover:border-gray-300"
+                ? "border-white bg-white text-[#111]"
+                : "border-[#2a2a2a] text-[#555] hover:border-[#333]"
             }`}
           >
             All
@@ -348,8 +349,8 @@ export default function App() {
               style={filterLabelId === label.id ? { backgroundColor: label.color } : undefined}
               className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
                 filterLabelId === label.id
-                  ? "border-transparent text-gray-800"
-                  : "border-gray-200 text-gray-500 hover:border-gray-300"
+                  ? "border-transparent text-[#e8e8e8]"
+                  : "border-[#2a2a2a] text-[#555] hover:border-[#333]"
               }`}
             >
               {label.name}
@@ -360,7 +361,7 @@ export default function App() {
 
       {/* Sessions list */}
       {filtered.length === 0 ? (
-        <p className="text-center text-sm text-gray-400 py-8">
+        <p className="text-center text-xs text-[#333] py-8">
           {sessions.length === 0 ? "No saved sessions yet." : "No sessions with this label."}
         </p>
       ) : (
@@ -374,49 +375,60 @@ export default function App() {
             return (
               <div
                 key={session.id}
-                className="border border-gray-100 rounded-xl p-3 hover:border-gray-200 transition-colors"
+                className={`rounded-xl p-3 border-l-2 transition-colors ${
+                  session.starred
+                    ? "bg-[#1a1500] border-l-amber-500 border border-amber-500/20"
+                    : "bg-[#1a1a1a] border-l-transparent border border-[#222] hover:border-[#2a2a2a]"
+                }`}
               >
                 <div className="flex justify-between items-start">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className={`text-sm font-medium ${session.starred ? "text-amber-100" : "text-[#e8e8e8]"}`}>
                         {allTabs.length} tab{allTabs.length !== 1 ? "s" : ""}
                       </p>
                       {label && (
                         <span
                           style={{ backgroundColor: label.color }}
-                          className="text-xs px-1.5 py-0.5 rounded text-gray-700 font-normal"
+                          className="text-xs px-1.5 py-0.5 rounded text-[#e8e8e8] font-normal"
                         >
                           {label.name}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{session.createdAt}</p>
+                    <p className={`text-xs mt-0.5 ${session.starred ? "text-amber-900" : "text-[#444]"}`}>
+                      {session.createdAt}
+                    </p>
                   </div>
-                  <div className="flex gap-1.5 ml-2 flex-shrink-0">
+
+                  <div className="flex gap-1 ml-2 flex-shrink-0 items-center">
                     <button
                       onClick={() => toggleStar(session.id)}
-                      className="px-2 py-1 rounded-lg transition-colors"
-                      title={session.starred ? "Unstar" : "Star to keep after restore"}
+                      className="px-1.5 py-1 rounded-lg transition-colors"
                     >
-                      <span className={session.starred ? "text-amber-400" : "text-gray-300 hover:text-amber-300"}>
+                      <span className={`text-sm ${session.starred ? "text-amber-400" : "text-[#333] hover:text-amber-500"}`}>
                         {session.starred ? "★" : "☆"}
                       </span>
                     </button>
                     <button
                       onClick={() => restoreSession(session)}
-                      className="text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+                      className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${
+                        session.starred
+                          ? "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                          : "bg-[#222] text-[#888] hover:bg-[#2a2a2a]"
+                      }`}
                     >
                       Restore
                     </button>
                     <button
                       onClick={() => deleteSession(session.id)}
-                      className="text-xs text-gray-400 hover:text-red-400 px-2 py-1 rounded-lg transition-colors"
+                      className="text-xs text-[#333] hover:text-red-500 px-2 py-1 rounded-lg transition-colors"
                     >
                       ×
                     </button>
                   </div>
                 </div>
+
                 <div className="mt-2 space-y-0.5">
                   {preview.map((tab, i) => (
                     <div key={i} className="flex items-center gap-1.5">
@@ -427,13 +439,17 @@ export default function App() {
                           onError={e => { e.currentTarget.style.display = "none" }}
                         />
                       ) : (
-                        <div className="w-3 h-3 rounded-sm bg-gray-100 flex-shrink-0" />
+                        <div className="w-3 h-3 rounded-sm bg-[#222] flex-shrink-0" />
                       )}
-                      <p className="text-xs text-gray-500 truncate">{tab.title}</p>
+                      <p className={`text-xs truncate ${session.starred ? "text-amber-200/60" : "text-[#555]"}`}>
+                        {tab.title}
+                      </p>
                     </div>
                   ))}
                   {remaining > 0 && (
-                    <p className="text-xs text-gray-400 pl-[18px]">+{remaining} more</p>
+                    <p className={`text-xs pl-[18px] ${session.starred ? "text-amber-900" : "text-[#333]"}`}>
+                      +{remaining} more
+                    </p>
                   )}
                 </div>
               </div>
@@ -443,7 +459,7 @@ export default function App() {
       )}
 
       {/* Label management */}
-      <div className="border-t border-gray-100 pt-3">
+      <div className="border-t border-[#1e1e1e] pt-3">
         {showAddLabel ? (
           <div className="flex gap-2">
             <input
@@ -455,14 +471,14 @@ export default function App() {
                 if (e.key === "Escape") { setShowAddLabel(false); setNewLabelName("") }
               }}
               placeholder="Label name…"
-              className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-gray-400"
+              className="flex-1 text-sm bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-2.5 py-1.5 outline-none focus:border-[#444] text-[#e8e8e8] placeholder-[#333]"
             />
-            <button onClick={addLabel} className="text-sm bg-gray-900 text-white px-3 py-1.5 rounded-lg">
+            <button onClick={addLabel} className="text-sm bg-white text-[#111] px-3 py-1.5 rounded-lg">
               Add
             </button>
             <button
               onClick={() => { setShowAddLabel(false); setNewLabelName("") }}
-              className="text-sm text-gray-400 px-2 py-1.5 rounded-lg hover:bg-gray-50"
+              className="text-sm text-[#444] px-2 py-1.5 rounded-lg hover:bg-[#1a1a1a]"
             >
               ✕
             </button>
@@ -474,12 +490,12 @@ export default function App() {
                 <div
                   key={label.id}
                   style={{ backgroundColor: label.color }}
-                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md text-gray-700"
+                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md text-[#e8e8e8]"
                 >
                   {label.name}
                   <button
                     onClick={() => deleteLabel(label.id)}
-                    className="text-gray-500 hover:text-gray-900 ml-0.5 leading-none"
+                    className="text-[#aaa] hover:text-white ml-0.5 leading-none"
                   >
                     ×
                   </button>
@@ -488,7 +504,7 @@ export default function App() {
             </div>
             <button
               onClick={() => setShowAddLabel(true)}
-              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-0.5 flex-shrink-0 ml-2"
+              className="text-xs text-[#333] hover:text-[#666] flex items-center gap-0.5 flex-shrink-0 ml-2"
             >
               <span className="text-sm leading-none">+</span> Label
             </button>
