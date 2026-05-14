@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react"
 
+const IS_FIREFOX = typeof globalThis.browser !== "undefined"
+const NEW_TAB_URL = IS_FIREFOX ? "about:newtab" : "chrome://newtab"
+
 const LABEL_COLORS = [
   "#e2e8f0", "#fecaca", "#fed7aa", "#fef08a",
   "#bbf7d0", "#bae6fd", "#e9d5ff", "#fbcfe8",
@@ -13,7 +16,9 @@ export default function App() {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [saving, setSaving] = useState(false)
   const [pendingSave, setPendingSave] = useState(null)
+  const [saveMode, setSaveMode] = useState("new")
   const [chosenLabelId, setChosenLabelId] = useState(null)
+  const [targetSessionId, setTargetSessionId] = useState(null)
   const [filterLabelId, setFilterLabelId] = useState(null)
   const [newLabelName, setNewLabelName] = useState("")
   const [showAddLabel, setShowAddLabel] = useState(false)
@@ -62,7 +67,9 @@ export default function App() {
         allSelected: selectedIds.size === currentTabs.length,
         tabs,
       })
+      setSaveMode("new")
       setChosenLabelId(null)
+      setTargetSessionId(null)
     } finally {
       setSaving(false)
     }
@@ -70,21 +77,33 @@ export default function App() {
 
   async function confirmSave() {
     if (!pendingSave) return
+    if (saveMode === "existing" && !targetSessionId) return
 
-    const session = {
-      id: Date.now(),
-      createdAt: new Date().toLocaleString(),
-      labelId: chosenLabelId,
-      windows: [{ tabs: pendingSave.tabs }]
-    }
     const existing = await chrome.storage.local.get("sessions")
-    const updated = [session, ...(existing.sessions || [])]
+    let updated
+
+    if (saveMode === "existing") {
+      updated = (existing.sessions || []).map(s => {
+        if (s.id !== targetSessionId) return s
+        const merged = [...(s.windows[0]?.tabs || []), ...pendingSave.tabs]
+        return { ...s, windows: [{ tabs: merged }] }
+      })
+    } else {
+      const session = {
+        id: Date.now(),
+        createdAt: new Date().toLocaleString(),
+        labelId: chosenLabelId,
+        windows: [{ tabs: pendingSave.tabs }]
+      }
+      updated = [session, ...(existing.sessions || [])]
+    }
+
     await chrome.storage.local.set({ sessions: updated })
     setSessions(updated.filter(s => Array.isArray(s.windows)))
 
     if (pendingSave.allSelected) {
       const allWindows = await chrome.windows.getAll()
-      if (allWindows.length === 1) await chrome.windows.create({})
+      if (allWindows.length === 1) await chrome.tabs.create({ url: NEW_TAB_URL })
       await chrome.windows.remove(pendingSave.windowId)
     } else {
       await chrome.tabs.remove(pendingSave.tabIds)
@@ -145,41 +164,96 @@ export default function App() {
       </div>
 
       {pendingSave ? (
-        /* Label picker */
+        /* Save mode picker */
         <div className="border border-gray-200 rounded-xl p-3 mb-4">
           <p className="text-sm font-medium text-gray-800 mb-2.5">
-            {pendingSave.tabs.length} tab{pendingSave.tabs.length !== 1 ? "s" : ""} — pick a label
+            {pendingSave.tabs.length} tab{pendingSave.tabs.length !== 1 ? "s" : ""}
           </p>
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            <button
-              onClick={() => setChosenLabelId(null)}
-              className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-                chosenLabelId === null
-                  ? "border-gray-800 bg-gray-800 text-white"
-                  : "border-gray-200 text-gray-500 hover:border-gray-300"
-              }`}
-            >
-              None
-            </button>
-            {labels.map(label => (
+
+          {/* Mode toggle */}
+          <div className="flex gap-1.5 mb-3">
+            {["new", "existing"].map(mode => (
               <button
-                key={label.id}
-                onClick={() => setChosenLabelId(label.id === chosenLabelId ? null : label.id)}
-                style={chosenLabelId === label.id ? { backgroundColor: label.color } : undefined}
-                className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-                  chosenLabelId === label.id
-                    ? "border-transparent text-gray-800"
+                key={mode}
+                onClick={() => setSaveMode(mode)}
+                disabled={mode === "existing" && sessions.length === 0}
+                className={`text-xs px-2.5 py-1 rounded-lg border transition-colors disabled:opacity-30 ${
+                  saveMode === mode
+                    ? "border-gray-800 bg-gray-800 text-white"
                     : "border-gray-200 text-gray-500 hover:border-gray-300"
                 }`}
               >
-                {label.name}
+                {mode === "new" ? "New session" : "Add to existing"}
               </button>
             ))}
           </div>
+
+          {saveMode === "new" ? (
+            /* Label picker */
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              <button
+                onClick={() => setChosenLabelId(null)}
+                className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                  chosenLabelId === null
+                    ? "border-gray-800 bg-gray-800 text-white"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300"
+                }`}
+              >
+                No label
+              </button>
+              {labels.map(label => (
+                <button
+                  key={label.id}
+                  onClick={() => setChosenLabelId(label.id === chosenLabelId ? null : label.id)}
+                  style={chosenLabelId === label.id ? { backgroundColor: label.color } : undefined}
+                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                    chosenLabelId === label.id
+                      ? "border-transparent text-gray-800"
+                      : "border-gray-200 text-gray-500 hover:border-gray-300"
+                  }`}
+                >
+                  {label.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            /* Existing session picker */
+            <div className="max-h-[150px] overflow-y-auto space-y-1 mb-3">
+              {sessions.map(session => {
+                const count = (session.windows || []).flatMap(w => w.tabs || []).length
+                const label = labels.find(l => l.id === session.labelId)
+                const isSelected = targetSessionId === session.id
+                return (
+                  <button
+                    key={session.id}
+                    onClick={() => setTargetSessionId(isSelected ? null : session.id)}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
+                      isSelected
+                        ? "border-gray-800 bg-gray-50"
+                        : "border-gray-100 hover:border-gray-200"
+                    }`}
+                  >
+                    <span className="font-medium text-gray-800">{count} tab{count !== 1 ? "s" : ""}</span>
+                    {label && (
+                      <span
+                        style={{ backgroundColor: label.color }}
+                        className="ml-1.5 px-1.5 py-0.5 rounded text-gray-700"
+                      >
+                        {label.name}
+                      </span>
+                    )}
+                    <span className="text-gray-400 ml-1.5">{session.createdAt}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               onClick={confirmSave}
-              className="flex-1 bg-gray-900 text-white rounded-lg py-2 text-sm font-medium"
+              disabled={saveMode === "existing" && !targetSessionId}
+              className="flex-1 bg-gray-900 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-30"
             >
               Save & close
             </button>

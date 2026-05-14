@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "ZenTab",
+  "version": "1.0.0",
+  "description": "Minimalist tab vault",
+  "permissions": [
+    "tabs",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "index.html"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "zentab@enzoblgz",
+      "strict_min_version": "109.0"
+    }
+  }
+}

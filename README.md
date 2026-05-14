@@ -6,20 +6,25 @@ A minimal Chrome extension to save, label, and restore browser windows. Keep you
 
 ## Install
 
-No build step needed — just load the `dist/` folder directly into Chrome.
+No build step needed — clone the repo and load the right folder for your browser.
 
-1. Clone the repo
-   ```bash
-   git clone https://github.com/Enzoblgz/zentab.git
-   ```
+```bash
+git clone https://github.com/Enzoblgz/zentab.git
+```
 
-2. Open Chrome and go to `chrome://extensions`
+### Chrome
 
-3. Enable **Developer mode** (toggle in the top-right corner)
+1. Go to `chrome://extensions`
+2. Enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked** → select the `dist/` folder
+4. Pin the ZenTab icon in your toolbar
 
-4. Click **Load unpacked** and select the `dist/` folder inside the cloned repo
+### Firefox
 
-5. The ZenTab icon will appear in your toolbar — pin it for easy access
+1. Go to `about:debugging#/runtime/this-firefox`
+2. Click **Load Temporary Add-on…**
+3. Open the `dist-firefox/` folder and select `manifest.json`
+4. The extension stays loaded until Firefox restarts — to make it permanent, sign and install it via [about:addons](about:addons)
 
 ---
 
@@ -58,10 +63,11 @@ If you want to modify the extension:
 
 ```bash
 npm install
-npm run build
+npm run build          # Chrome → dist/
+npm run build:firefox  # Firefox → dist-firefox/
 ```
 
-Then reload the unpacked extension in `chrome://extensions`.
+Then reload the unpacked extension in your browser.
 
 ---
 
