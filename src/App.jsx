@@ -120,11 +120,19 @@ export default function App() {
       const urls = (winData.tabs || []).map(t => t.url).filter(Boolean)
       if (urls.length > 0) await chrome.windows.create({ url: urls })
     }
-    await deleteSession(session.id)
+    if (!session.starred) await deleteSession(session.id)
   }
 
   async function deleteSession(id) {
     const updated = sessions.filter(s => s.id !== id)
+    await chrome.storage.local.set({ sessions: updated })
+    setSessions(updated)
+  }
+
+  async function toggleStar(id) {
+    const updated = sessions.map(s =>
+      s.id === id ? { ...s, starred: !s.starred } : s
+    )
     await chrome.storage.local.set({ sessions: updated })
     setSessions(updated)
   }
@@ -386,6 +394,15 @@ export default function App() {
                     <p className="text-xs text-gray-400 mt-0.5">{session.createdAt}</p>
                   </div>
                   <div className="flex gap-1.5 ml-2 flex-shrink-0">
+                    <button
+                      onClick={() => toggleStar(session.id)}
+                      className="px-2 py-1 rounded-lg transition-colors"
+                      title={session.starred ? "Unstar" : "Star to keep after restore"}
+                    >
+                      <span className={session.starred ? "text-amber-400" : "text-gray-300 hover:text-amber-300"}>
+                        {session.starred ? "★" : "☆"}
+                      </span>
+                    </button>
                     <button
                       onClick={() => restoreSession(session)}
                       className="text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
