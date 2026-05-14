@@ -2,8 +2,6 @@
 
 A minimal Chrome extension to save, label, and restore browser windows. Keep your workspace clean by stashing tabs you're not using right now and bringing them back whenever you need them.
 
-![ZenTab popup](https://github.com/user-attachments/assets/placeholder)
-
 ---
 
 ## Install
