@@ -8,6 +8,9 @@ const LABEL_COLORS = [
 export default function App() {
   const [sessions, setSessions] = useState([])
   const [labels, setLabels] = useState([])
+  const [currentTabs, setCurrentTabs] = useState([])
+  const [currentWindowId, setCurrentWindowId] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(new Set())
   const [saving, setSaving] = useState(false)
   const [pendingSave, setPendingSave] = useState(null)
   const [chosenLabelId, setChosenLabelId] = useState(null)
@@ -19,19 +22,45 @@ export default function App() {
     const data = await chrome.storage.local.get(["sessions", "labels"])
     setSessions((data.sessions || []).filter(s => Array.isArray(s.windows)))
     setLabels(data.labels || [])
+
+    const win = await chrome.windows.getCurrent({ populate: true })
+    setCurrentWindowId(win.id)
+    setCurrentTabs(win.tabs || [])
+    setSelectedIds(new Set((win.tabs || []).map(t => t.id)))
+  }
+
+  function toggleTab(tabId) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(tabId) ? next.delete(tabId) : next.add(tabId)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (selectedIds.size === currentTabs.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(currentTabs.map(t => t.id)))
+    }
   }
 
   async function startSave() {
+    if (selectedIds.size === 0) return
     setSaving(true)
     try {
-      const currentWindow = await chrome.windows.getCurrent({ populate: true })
-      setPendingSave({
-        windowId: currentWindow.id,
-        tabs: currentWindow.tabs.map(tab => ({
+      const tabs = currentTabs
+        .filter(t => selectedIds.has(t.id))
+        .map(tab => ({
           title: tab.title,
           url: tab.url,
           favicon: tab.favIconUrl || null,
         }))
+      setPendingSave({
+        windowId: currentWindowId,
+        tabIds: [...selectedIds],
+        allSelected: selectedIds.size === currentTabs.length,
+        tabs,
       })
       setChosenLabelId(null)
     } finally {
@@ -41,6 +70,7 @@ export default function App() {
 
   async function confirmSave() {
     if (!pendingSave) return
+
     const session = {
       id: Date.now(),
       createdAt: new Date().toLocaleString(),
@@ -52,9 +82,17 @@ export default function App() {
     await chrome.storage.local.set({ sessions: updated })
     setSessions(updated.filter(s => Array.isArray(s.windows)))
 
-    const allWindows = await chrome.windows.getAll()
-    if (allWindows.length === 1) await chrome.windows.create({})
-    await chrome.windows.remove(pendingSave.windowId)
+    if (pendingSave.allSelected) {
+      const allWindows = await chrome.windows.getAll()
+      if (allWindows.length === 1) await chrome.windows.create({})
+      await chrome.windows.remove(pendingSave.windowId)
+    } else {
+      await chrome.tabs.remove(pendingSave.tabIds)
+      const win = await chrome.windows.getCurrent({ populate: true })
+      setCurrentTabs(win.tabs || [])
+      setSelectedIds(new Set((win.tabs || []).map(t => t.id)))
+    }
+
     setPendingSave(null)
   }
 
@@ -92,9 +130,8 @@ export default function App() {
 
   useEffect(() => { load() }, [])
 
-  const filtered = filterLabelId
-    ? sessions.filter(s => s.labelId === filterLabelId)
-    : sessions
+  const allSelected = currentTabs.length > 0 && selectedIds.size === currentTabs.length
+  const filtered = filterLabelId ? sessions.filter(s => s.labelId === filterLabelId) : sessions
 
   return (
     <div className="w-[400px] bg-white p-5">
@@ -107,13 +144,12 @@ export default function App() {
         )}
       </div>
 
-      {/* Save button or pending-save label picker */}
       {pendingSave ? (
+        /* Label picker */
         <div className="border border-gray-200 rounded-xl p-3 mb-4">
           <p className="text-sm font-medium text-gray-800 mb-2.5">
             {pendingSave.tabs.length} tab{pendingSave.tabs.length !== 1 ? "s" : ""} — pick a label
           </p>
-
           <div className="flex flex-wrap gap-1.5 mb-3">
             <button
               onClick={() => setChosenLabelId(null)}
@@ -140,13 +176,12 @@ export default function App() {
               </button>
             ))}
           </div>
-
           <div className="flex gap-2">
             <button
               onClick={confirmSave}
               className="flex-1 bg-gray-900 text-white rounded-lg py-2 text-sm font-medium"
             >
-              Save & close window
+              Save & close
             </button>
             <button
               onClick={() => setPendingSave(null)}
@@ -157,13 +192,58 @@ export default function App() {
           </div>
         </div>
       ) : (
-        <button
-          onClick={startSave}
-          disabled={saving}
-          className="w-full bg-gray-900 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50 transition-opacity mb-4"
-        >
-          {saving ? "Reading tabs…" : "Save & close this window"}
-        </button>
+        /* Tab selector */
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+              This window
+            </span>
+            <button
+              onClick={toggleAll}
+              className="text-xs text-gray-400 hover:text-gray-700"
+            >
+              {allSelected ? "Deselect all" : "Select all"}
+            </button>
+          </div>
+
+          <div className="max-h-[180px] overflow-y-auto space-y-0.5 mb-3">
+            {currentTabs.map(tab => (
+              <label
+                key={tab.id}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(tab.id)}
+                  onChange={() => toggleTab(tab.id)}
+                  className="w-3.5 h-3.5 flex-shrink-0 accent-gray-900"
+                />
+                {tab.favIconUrl ? (
+                  <img
+                    src={tab.favIconUrl}
+                    className="w-3.5 h-3.5 flex-shrink-0"
+                    onError={e => { e.currentTarget.style.display = "none" }}
+                  />
+                ) : (
+                  <div className="w-3.5 h-3.5 rounded-sm bg-gray-100 flex-shrink-0" />
+                )}
+                <span className="text-xs text-gray-700 truncate">{tab.title}</span>
+              </label>
+            ))}
+          </div>
+
+          <button
+            onClick={startSave}
+            disabled={selectedIds.size === 0 || saving}
+            className="w-full bg-gray-900 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-30 transition-opacity"
+          >
+            {selectedIds.size === 0
+              ? "Select tabs to save"
+              : allSelected
+              ? "Save & close all tabs"
+              : `Save & close ${selectedIds.size} tab${selectedIds.size !== 1 ? "s" : ""}`}
+          </button>
+        </div>
       )}
 
       {/* Label filter pills */}
@@ -198,7 +278,7 @@ export default function App() {
 
       {/* Sessions list */}
       {filtered.length === 0 ? (
-        <p className="text-center text-sm text-gray-400 py-10">
+        <p className="text-center text-sm text-gray-400 py-8">
           {sessions.length === 0 ? "No saved sessions yet." : "No sessions with this label."}
         </p>
       ) : (
@@ -231,7 +311,6 @@ export default function App() {
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">{session.createdAt}</p>
                   </div>
-
                   <div className="flex gap-1.5 ml-2 flex-shrink-0">
                     <button
                       onClick={() => restoreSession(session)}
@@ -247,7 +326,6 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-
                 <div className="mt-2 space-y-0.5">
                   {preview.map((tab, i) => (
                     <div key={i} className="flex items-center gap-1.5">
@@ -288,10 +366,7 @@ export default function App() {
               placeholder="Label name…"
               className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-gray-400"
             />
-            <button
-              onClick={addLabel}
-              className="text-sm bg-gray-900 text-white px-3 py-1.5 rounded-lg"
-            >
+            <button onClick={addLabel} className="text-sm bg-gray-900 text-white px-3 py-1.5 rounded-lg">
               Add
             </button>
             <button

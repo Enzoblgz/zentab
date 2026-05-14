@@ -10,7 +10,7 @@ No build step needed — just load the `dist/` folder directly into Chrome.
 
 1. Clone the repo
    ```bash
-   git clone https://github.com/YOUR_USERNAME/zentab.git
+   git clone https://github.com/Enzoblgz/zentab.git
    ```
 
 2. Open Chrome and go to `chrome://extensions`
@@ -25,20 +25,27 @@ No build step needed — just load the `dist/` folder directly into Chrome.
 
 ## How to use
 
-### Save a window
-Click the ZenTab icon, then **Save & close this window**.  
-Before the window closes, a label picker appears — assign a label or skip it. The window closes and its tabs are saved as a session.
+### Select and save tabs
+Click the ZenTab icon — the popup shows every tab open in the current window, all pre-selected.  
+Check or uncheck individual tabs to choose exactly what you want to save.  
+Use **Select all / Deselect all** to toggle everything at once.
+
+The save button reflects your selection:
+- *"Save & close 3 tabs"* — only those tabs close, the window stays open with the rest
+- *"Save & close all tabs"* — the entire window closes
+
+Click it, pick an optional label, then confirm.
 
 ### Labels
 At the bottom of the popup, click **+ Label** to create a new one.  
 Labels are color-coded automatically. Delete any label with the `×` next to it.
 
 ### Filter sessions
-Once you have labels, a filter bar appears at the top of the popup.  
+Once you have labels, a filter bar appears above the saved sessions.  
 Click a label to show only sessions tagged with it. Click it again (or **All**) to reset.
 
-### Restore a window
-Find the session you want and click **Restore** — all its tabs reopen in a new window.
+### Restore a session
+Find the session you want and click **Restore** — all its tabs reopen in a new window and the session is removed from the list.
 
 ### Delete a session
 Click `×` on any session card to remove it permanently.
