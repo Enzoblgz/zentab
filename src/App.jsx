@@ -63,6 +63,7 @@ export default function App() {
       const urls = (winData.tabs || []).map(t => t.url).filter(Boolean)
       if (urls.length > 0) await chrome.windows.create({ url: urls })
     }
+    await deleteSession(session.id)
   }
 
   async function deleteSession(id) {
